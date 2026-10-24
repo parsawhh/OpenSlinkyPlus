@@ -1,0 +1,25 @@
+# Build output - never upload
+build/
+dist/
+out/
+.gradle/
+SlinkyClient/build/
+SlinkyClient/.gradle/
+
+# Release zips you make yourself (upload these under Releases instead)
+*.zip
+
+# Visual Studio and other editors
+.vs/
+*.user
+*.suo
+.idea/
+*.iml
+
+# Logs and temp files
+*.log
+*.tmp
+
+# Windows junk
+Thumbs.db
+Desktop.ini
