@@ -1,0 +1,28 @@
+name: Announce release on Discord
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post to Discord
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+          ROLE_ID: "1563766776825774180"
+          RELEASE_NAME: ${{ github.event.release.name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_URL: ${{ github.event.release.html_url }}
+          RELEASE_BODY: ${{ github.event.release.body }}
+        run: |
+          TITLE="${RELEASE_NAME:-$RELEASE_TAG}"
+          payload=$(jq -n \
+            --arg content "<@&${ROLE_ID}> OpenSlinky+ **${TITLE}** is out!" \
+            --arg role "$ROLE_ID" \
+            --arg title "$TITLE" \
+            --arg url "$RELEASE_URL" \
+            --arg body "${RELEASE_BODY:0:1500}" \
+            '{content: $content, allowed_mentions: {roles: [$role]}, embeds: [{title: $title, url: $url, description: $body, color: 16748488}]}')
+          curl -sS -f -H "Content-Type: application/json" -d "$payload" "$WEBHOOK_URL"
