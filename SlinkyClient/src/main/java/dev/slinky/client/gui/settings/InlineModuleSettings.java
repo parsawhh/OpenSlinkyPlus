@@ -166,7 +166,18 @@ public final class InlineModuleSettings {
    }
 
    private static JsonObject schema(Module module, Setting<?> setting) {
-      for (JsonElement row : ModuleCatalog.module(module.getName()).getAsJsonArray("settings")) {
+      JsonObject catalog = null;
+      try {
+         catalog = ModuleCatalog.module(module.getName());
+      } catch (IllegalArgumentException e) {
+         catalog = null;
+      }
+
+      if (catalog == null) {
+         return new JsonObject();
+      }
+
+      for (JsonElement row : catalog.getAsJsonArray("settings")) {
          JsonObject value = row.getAsJsonObject();
          if (value.get("key").getAsString().equals(setting.getKey())) {
             return value;
@@ -177,13 +188,36 @@ public final class InlineModuleSettings {
    }
 
    private static JsonObject metadata(Module module, Setting<?> setting) {
-      return METADATA.getAsJsonObject(module.getName()).getAsJsonObject(setting.getKey());
+      JsonObject moduleMetadata = METADATA.getAsJsonObject(module.getName());
+      if (moduleMetadata == null) {
+         return fallbackMetadata(setting);
+      }
+
+      JsonObject row = moduleMetadata.getAsJsonObject(setting.getKey());
+      return row == null ? fallbackMetadata(setting) : row;
+   }
+
+   private static JsonObject fallbackMetadata(Setting<?> setting) {
+      JsonObject result = new JsonObject();
+      result.addProperty("label", setting.getLabel());
+      result.addProperty("title", setting.getLabel());
+      result.addProperty("flag", 0);
+      result.addProperty("suggestions_endpoint_present", false);
+      return result;
    }
 
    public List<String> render(Module module, GuiMath.Runtime state, DrawPlan plan, GuiMath.Layout layout, float[] accent, double now) {
       List<String> drawn = new ArrayList<>();
+      List<String> order = ORDER.get(module.getName());
+      if (order == null) {
+         order = new ArrayList<>();
 
-      for (String token : ORDER.get(module.getName())) {
+         for (Setting<?> setting : module.getSettings()) {
+            order.add(setting.getKey());
+         }
+      }
+
+      for (String token : order) {
          ModuleSettingsLayout.Control next = null;
          Map<String, Integer> counts = new HashMap<>();
 

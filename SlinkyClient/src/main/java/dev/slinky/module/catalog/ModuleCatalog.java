@@ -52,12 +52,22 @@ public final class ModuleCatalog {
    }
 
    public static int descriptorFlags(String name) {
-      JsonArray observations = DESCRIPTORS.get(name).getAsJsonArray("observations");
+      JsonObject descriptor = DESCRIPTORS.get(name);
+      if (descriptor == null) {
+         return 0;
+      }
+
+      JsonArray observations = descriptor.getAsJsonArray("observations");
       return observations.size() == 0 ? 0 : observations.get(0).getAsJsonObject().get("flags").getAsInt();
    }
 
    public static int descriptorCategory(String name) {
-      JsonArray observations = DESCRIPTORS.get(name).getAsJsonArray("observations");
+      JsonObject descriptor = DESCRIPTORS.get(name);
+      if (descriptor == null) {
+         return -1;
+      }
+
+      JsonArray observations = descriptor.getAsJsonArray("observations");
       return observations.size() == 0 ? -1 : observations.get(0).getAsJsonObject().get("category").getAsInt();
    }
 
@@ -160,7 +170,12 @@ public final class ModuleCatalog {
    }
 
    public static int priority(String name, int event) {
-      for (JsonElement descriptor : module(name).getAsJsonArray("descriptor_observations")) {
+      JsonObject record = MODULES.get(name);
+      if (record == null) {
+         return 0;
+      }
+
+      for (JsonElement descriptor : record.getAsJsonArray("descriptor_observations")) {
          for (JsonElement callback : descriptor.getAsJsonObject().getAsJsonArray("callbacks")) {
             JsonObject c = callback.getAsJsonObject();
             if (c.get("event").getAsInt() == event) {

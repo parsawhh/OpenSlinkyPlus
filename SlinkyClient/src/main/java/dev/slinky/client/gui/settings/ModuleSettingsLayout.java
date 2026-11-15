@@ -52,7 +52,7 @@ public final class ModuleSettingsLayout {
    public static List<ModuleSettingsLayout.Control> controls(Module module) {
       JsonObject layout = LAYOUTS.get(module.getName());
       if (layout == null) {
-         throw new IllegalStateException("Missing module UI " + module.getName());
+         return fallback(module);
       } else {
          JsonArray gates = layout.getAsJsonArray("gates");
 
@@ -116,5 +116,17 @@ public final class ModuleSettingsLayout {
          this.section = section;
          this.setting = setting;
       }
+   }
+
+   private static List<ModuleSettingsLayout.Control> fallback(Module module) {
+      List<ModuleSettingsLayout.Control> result = new ArrayList<>();
+
+      for (Setting<?> setting : module.getSettings()) {
+         if (module.settingVisible(setting.getKey())) {
+            result.add(new ModuleSettingsLayout.Control(null, setting));
+         }
+      }
+
+      return Collections.unmodifiableList(result);
    }
 }
