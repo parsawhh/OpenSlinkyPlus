@@ -246,6 +246,12 @@ public final class ScriptHost {
 
    public void reload(String id) {
       Path file = this.directory.resolve(id + ".js");
+      ScriptModule previous = this.modules.get(id);
+      boolean wasEnabled = previous != null && previous.isEnabled();
+      int binding = previous == null ? 0 : previous.getBinding();
+      boolean holdBinding = previous != null && previous.isHoldBinding();
+      Map<String, String> values = captureSettings(previous);
+
       this.unload(id);
 
       if (!Files.isRegularFile(file)) {
@@ -260,10 +266,18 @@ public final class ScriptHost {
          ScriptRuntime runtime = new ScriptRuntime(this.manager, this.statusDirectory, manifest);
          ScriptModule module = new ScriptModule(runtime);
          runtime.prepare(source);
+         restoreSettings(module, values);
+         if (binding != 0) {
+            module.setBinding(binding);
+            module.setHoldBinding(holdBinding);
+         }
          this.manager.register(module);
          this.runtimes.put(id, runtime);
          this.modules.put(id, module);
          this.applied.put(id, this.stamp(file));
+         if (wasEnabled) {
+            this.manager.setEnabled(module, true, false);
+         }
          Platform.log("script loaded: " + manifest.id());
       } catch (Throwable e) {
          Platform.log("script failed: " + id + ": " + e);
@@ -325,6 +339,36 @@ public final class ScriptHost {
       ScriptRuntime runtime = this.runtimes.remove(id);
       if (runtime != null) {
          runtime.close();
+      }
+   }
+
+   private static Map<String, String> captureSettings(ScriptModule module) {
+      Map<String, String> result = new LinkedHashMap<String, String>();
+      if (module == null) {
+         return result;
+      }
+
+      for (Setting<?> setting : module.getSettings()) {
+         Object value = setting.get();
+         result.put(setting.getKey(), value == null ? "" : String.valueOf(value));
+      }
+
+      return result;
+   }
+
+   private static void restoreSettings(ScriptModule module, Map<String, String> values) {
+      if (module == null || values == null || values.isEmpty()) {
+         return;
+      }
+
+      for (Setting<?> setting : module.getSettings()) {
+         String value = values.get(setting.getKey());
+         if (value != null) {
+            try {
+               setting.parseAndSet(value);
+            } catch (Throwable ignored) {
+            }
+         }
       }
    }
 

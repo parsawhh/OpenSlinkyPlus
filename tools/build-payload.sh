@@ -53,5 +53,8 @@ mkdir -p "$OUT/tests"
 javac --release 8 -nowarn -cp "$CP" -d "$OUT/tests" tools/ScriptHostSmokeTest.java tools/ScriptServerSmokeTest.java
 java -cp "$OUT/tests:$CP" ScriptHostSmokeTest | tail -3
 java -cp "$OUT/tests:$CP" dev.slinky.script.ScriptServerSmokeTest | tail -3
+mkdir -p "$OUT/modtests"
+javac --release 8 -nowarn -cp "$CP" -d "$OUT/modtests" tools/ScriptModulesSmokeTest.java
+java -cp "$OUT/modtests:$CP" dev.slinky.script.ScriptModulesSmokeTest "$ROOT/scripts" | tail -30
 
 ls -la "$PAYLOAD"

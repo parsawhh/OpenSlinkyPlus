@@ -85,6 +85,10 @@ public final class ModuleManager {
       }
    }
 
+   public void replace(Module module) {
+      this.byId.put(normalize(module.getId()), module);
+   }
+
    public void setPersistence(Runnable persistence) {
       this.persistence = persistence;
    }

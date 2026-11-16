@@ -2,6 +2,7 @@ package dev.slinky.script;
 
 import dev.slinky.client.ClientContext;
 import dev.slinky.client.event.SemanticEvent;
+import dev.slinky.client.render.RenderAccess;
 import dev.slinky.client.rotation.RotationService;
 import dev.slinky.inject.Platform;
 import dev.slinky.module.Module;
@@ -33,6 +34,8 @@ public final class ScriptRuntime {
    private volatile long ticks;
    private volatile ClientContext context;
    private volatile Thread owner;
+   private final ThreadLocal<SemanticEvent> currentEvent = new ThreadLocal<SemanticEvent>();
+   private final ThreadLocal<ScriptDraw> currentDraw = new ThreadLocal<ScriptDraw>();
 
    public ScriptRuntime(ModuleManager manager, Path statusDirectory, ScriptManifest manifest) {
       this.manager = manager;
@@ -77,9 +80,26 @@ public final class ScriptRuntime {
       return this.ticks;
    }
 
+   public ClientContext context() {
+      return this.context;
+   }
+
+   public SemanticEvent currentEvent() {
+      return this.currentEvent.get();
+   }
+
+   public ScriptDraw draw() {
+      ScriptDraw d = this.currentDraw.get();
+      if (d == null) {
+         d = new ScriptDraw(this);
+         this.currentDraw.set(d);
+      }
+      return d;
+   }
+
    public List<String> recent() {
       synchronized (this.recent) {
-         return new ArrayList<>(this.recent);
+         return new ArrayList<String>(this.recent);
       }
    }
 
@@ -159,10 +179,22 @@ public final class ScriptRuntime {
          return;
       }
 
+      this.currentEvent.set(event);
+      this.currentDraw.set(null);
       try {
          this.engine.call("onEvent", this.api, new ScriptEvent(event));
       } catch (ScriptException e) {
          this.fail(e);
+      } finally {
+         ScriptDraw d = this.currentDraw.get();
+         if (d != null && !event.cancelled) {
+            try {
+               RenderAccess.submit(event, d.plan());
+            } catch (Throwable ignored) {
+            }
+         }
+         this.currentDraw.remove();
+         this.currentEvent.remove();
       }
    }
 

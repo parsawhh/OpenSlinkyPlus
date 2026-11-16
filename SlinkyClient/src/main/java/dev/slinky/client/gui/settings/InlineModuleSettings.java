@@ -174,7 +174,12 @@ public final class InlineModuleSettings {
       }
 
       if (catalog == null) {
-         return new JsonObject();
+         JsonObject fallback = new JsonObject();
+         if (setting instanceof NumberSetting) {
+            fallback.addProperty("step_observation", Double.valueOf(((NumberSetting)setting).getStep()));
+         }
+
+         return fallback;
       }
 
       for (JsonElement row : catalog.getAsJsonArray("settings")) {

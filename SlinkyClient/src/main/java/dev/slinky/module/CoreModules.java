@@ -169,8 +169,8 @@ public final class CoreModules {
          }
       }
 
-      if (!byName.isEmpty()) {
-         throw new IllegalStateException("Unmatched implementations " + byName.keySet());
+      for (Module modulex : byName.values()) {
+         manager.register(modulex);
       }
 
       ScriptHost.install(manager);

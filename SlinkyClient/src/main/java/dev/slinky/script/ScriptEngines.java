@@ -1,6 +1,5 @@
 package dev.slinky.script;
 
-import org.mozilla.javascript.ClassShutter;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.Function;
 import org.mozilla.javascript.RhinoException;
@@ -16,30 +15,11 @@ public final class ScriptEngines {
          Context context = Context.enter();
          context.setOptimizationLevel(-1);
          context.setLanguageVersion(Context.VERSION_1_8);
-         try {
-            context.setClassShutter(new Shutter());
-         } catch (SecurityException e) {
-            // the context of this thread already carries a shutter
-         }
-
+         context.setWrapFactory(ScriptValues.wrapFactory());
          Scriptable scope = context.initStandardObjects();
          return new Rhino(context, scope);
       } catch (Throwable e) {
          throw new ScriptException("Rhino engine unavailable: " + e, e);
-      }
-   }
-
-   private static final class Shutter implements ClassShutter {
-      public boolean visibleToScripts(String className) {
-         if (className.startsWith("dev.slinky.")) {
-            return true;
-         }
-
-         if (className.startsWith("java.lang.") || className.startsWith("java.util.") || className.startsWith("java.math.")) {
-            return true;
-         }
-
-         return false;
       }
    }
 

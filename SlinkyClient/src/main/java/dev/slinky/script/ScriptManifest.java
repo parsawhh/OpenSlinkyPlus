@@ -264,7 +264,7 @@ public final class ScriptManifest {
             continue;
          }
 
-         buffer.append('\n').append(trimmed);
+         buffer.append('\n').append(stripComment(trimmed));
          depth += depth(trimmed);
          if (depth <= 0 && buffer.toString().trim().length() > 0) {
             break;
@@ -276,6 +276,18 @@ public final class ScriptManifest {
       }
 
       return buffer.toString();
+   }
+
+   private static String stripComment(String line) {
+      if (line.startsWith("//")) {
+         return line.substring(2).trim();
+      }
+
+      if (line.startsWith("/*")) {
+         return line.substring(2).trim();
+      }
+
+      return line;
    }
 
    private static int depth(String text) {
