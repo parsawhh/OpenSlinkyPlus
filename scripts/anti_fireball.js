@@ -18,7 +18,7 @@ function removeMissing(arr, ids){ for(var i=arr.length-1;i>=0;i--) if(ids.indexO
 
 function angleToEntity(api, p, e){
   var dx=e.x-p.x, dz=e.z-p.z;
-  var dy=(e.y + (e.h||1.0)/2.0) - (p.y + 1.62);
+  var dy=(e.y + (e.height||1.0)/2.0) - (p.y + 1.62);
   var horiz=Math.sqrt(dx*dx+dz*dz);
   var yaw=Math.atan2(dz,dx)*180/Math.PI - 90.0;
   var pitch=-Math.atan2(dy,horiz)*180/Math.PI;
@@ -29,7 +29,7 @@ function angleToEntity(api, p, e){
 
 function getRotationsToBox(api, e){
   var p=api.player();
-  var cx=e.x, cy=e.y + (e.h||1.0)/2.0, cz=e.z;
+  var cx=e.x, cy=e.y + (e.height||1.0)/2.0, cz=e.z;
   var dx=cx-p.x, dy=cy-(p.y+1.62), dz=cz-p.z;
   var horiz=Math.sqrt(dx*dx+dz*dz);
   var yaw=Math.atan2(dz,dx)*180/Math.PI - 90.0;
@@ -77,18 +77,19 @@ function onTick(api){
 function onEvent(api,event){
   if(!api.isEnabled || !api.isEnabled()) return;
   var t=event.getType(); var p=api.player(); if(!p||!p.inWorld) return;
-  if(t===13 || t===21){ // rotation/update pass
+  if(t===13){ // rotation pass
     var tgt = targetId!=null ? findEntity(api,targetId) : null;
     if(!tgt) return;
     var rots = getRotationsToBox(api,tgt);
     if(api.bool('rotations')){
       var h=api.heldItem();
       var holdingNonEmpty = h && !h.empty;
-      var using=false; try{ var pr=api.rawPlayer(); if(pr) using=!!pr.call('isUsingItem'); }catch(e){}
-      // no bow/hold item/use check approximation
+      var using = !!p.usingItem;
+      // matches Myau: rotate unless a drawn/used item is in hand
       if(!holdingNonEmpty || !using){
         api.claimRotation(0);
         api.look(rots[0], rots[1]);
+        if((api.num('move_fix')|0)!==0) event.setRemapMovement(true);
       }
     }
     doAttackAnimation(api);
@@ -98,11 +99,18 @@ function onEvent(api,event){
     }
   }
   if(t===6){ // render world
-    if(api.num('show_target')|0 === 0) return;
+    var mode = api.num('show_target')|0;
+    if(mode===0) return;
     var tgt = targetId!=null ? findEntity(api,targetId) : null; if(!tgt) return;
     var d=api.draw(); if(!d||!d.box) return;
-    var col = 0x55FF5555;
-    if((api.num('show_target')|0)===1){ col = 0x55FF5555; }
-    d.box(tgt.x, tgt.y, tgt.z, 0.8, 0.8, 0.8, col, 2.0);
+    var col = 0x5533DD33;
+    if(mode===1){
+      var dx=tgt.x-(tgt.lastX!=null?tgt.lastX:tgt.x);
+      var dy=tgt.y-(tgt.lastY!=null?tgt.lastY:tgt.y);
+      var dz=tgt.z-(tgt.lastZ!=null?tgt.lastZ:tgt.z);
+      var dot=dx*(p.x-tgt.x)+dy*((p.y+(p.eyeHeight||1.62))-tgt.y-(tgt.height||1.8)/2.0)+dz*(p.z-tgt.z);
+      col = dot<0 ? 0x55FF5555 : 0x5533DD33;
+    }
+    d.box(tgt.x, tgt.y, tgt.z, tgt.width||0.8, tgt.height||1.8, tgt.width||0.8, col, 2.0);
   }
 }

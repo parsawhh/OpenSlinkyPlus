@@ -16,42 +16,61 @@ function shouldSkip(api, e){
   if(e.id===p.id) return true;
   if(api.bool('ignore_non_players') && !e.player) return true;
   if(e.player){
-    if(api.bool('ignore_teammates') && (e.flags&4)) return true;
-    if((e.flags&2) || (e.flags&1)) return true;
+    if(api.bool('ignore_teammates') && (e.flags&1)) return true;
+    if((e.flags&2) || (e.flags&4)) return true;
   }
   return false;
 }
 
+function vanillaBlockTarget(api){
+  try{
+    var mc=api.mc(); if(!mc) return false;
+    var mo=mc.get('objectMouseOver');
+    if(!mo) return false;
+    var ref=api.ref(mo);
+    var type=String(ref.get('typeOfHit')||'');
+    return type.indexOf('BLOCK')>=0;
+  }catch(e){ return false; }
+}
+
+function reachDistance(api){
+  var reach=3.0;
+  if(api.moduleEnabled('reach')){
+    var value=api.moduleSetting('reach','distance');
+    if(value!==null && value!==undefined) reach=Math.max(reach, Number(value));
+  }
+  return reach;
+}
+
 function onEvent(api,event){
   if(!api.isEnabled || !api.isEnabled()) return;
-  if(event.getType()!==14) return; // PRE_INTERACT
-  if(!event.isActive || !event.isActive()) return; // attack
+  if(event.getType()!==14) return;
+  if(!event.isActive || !event.isActive()) return;
   if(api.bool('weapon_only') && !holdingWeapon(api)) return;
-  // override mouse over: if ignore_blocks or not targeting block
-  // script can't set mc.objectMouseOver; instead intercept attack and perform entity attack
+  if(!api.bool('ignore_blocks') && vanillaBlockTarget(api)) return;
+
   var p=api.player(); if(!p||!p.inWorld) return;
-  var reach = 3.0; // standard; extended reach not exposed
+  var reach=reachDistance(api);
+  var extended=reach>3.0;
   var ents=api.entities();
-  var best=null, bestHit=null, bestDist=1e9, bestLiving=false, bestHurt=1e9, bestHp=1e9;
+  var best=null, bestDist=1e9, bestLiving=false, bestHurt=1e9, bestHp=1e9;
   var mode = api.num('sort_mode')|0;
   var yaw=p.yaw*Math.PI/180.0, pitch=p.pitch*Math.PI/180.0;
   var lx=-Math.sin(yaw)*Math.cos(pitch), ly=-Math.sin(pitch), lz=Math.cos(yaw)*Math.cos(pitch);
-  var ex=p.x, ey=p.y+1.62, ez=p.z;
+  var ex=p.x, ey=p.y+(p.eyeHeight||1.62), ez=p.z;
+
   for(var i=0;i<ents.length;i++){
     var e=ents[i]; if(shouldSkip(api,e)) continue;
-    // AABB approx
-    var w=0.6, h=(e.h||1.8), border=0.1; var minx=e.x-w/2-border, maxx=e.x+w/2+border, miny=e.y-border, maxy=e.y+h+border, minz=e.z-w/2-border, maxz=e.z+w/2+border;
-    // inside check
+    var w=(e.width||0.6), h=(e.height||1.8), border=0.1;
+    var minx=e.x-w/2-border, maxx=e.x+w/2+border, miny=e.y-border, maxy=e.y+h+border, minz=e.z-w/2-border, maxz=e.z+w/2+border;
     var inside = ex>=minx&&ex<=maxx&&ey>=miny&&ey<=maxy&&ez>=minz&&ez<=maxz;
-    // ray-AABB
-    var tmin=-1e9,tmax=1e9; var hit=null; var hx=ex,hy=ey,hz=ez;
-    function slab(o,d,mn,mx){ if(Math.abs(d)<1e-8){ if(o<mn||o>mx) return false; return true; } var t1=(mn-o)/d, t2=(mx-o)/d; if(t1>t2){var tmp=t1;t1=t2;t2=tmp;} if(t1>tmin) tmin=t1; if(t2<tmax) tmax=t2; return tmin<=tmax; }
+    var tmin=-1e9,tmax=1e9;
+    function slab(o,d,mn,mx){ if(Math.abs(d)<1e-8){ return !(o<mn||o>mx); } var t1=(mn-o)/d, t2=(mx-o)/d; if(t1>t2){var tmp=t1;t1=t2;t2=tmp;} if(t1>tmin) tmin=t1; if(t2<tmax) tmax=t2; return tmin<=tmax; }
     var ok = slab(ex,lx,minx,maxx)&&slab(ey,ly,miny,maxy)&&slab(ez,lz,minz,maxz);
     if(!inside && (!ok || tmax<0)) continue;
-    var dist = inside?0.0: (tmin<0?0.0:tmin);
-    // convert param t to distance (dir normalized)
-    var ddx=(ex+lx*dist)-ex, ddy=(ey+ly*dist)-ey, ddz=(ez+lz*dist)-ez; dist = Math.sqrt(ddx*ddx+ddy*ddy+ddz*ddz);
+    var dist = inside?0.0:Math.max(0.0,tmin);
     if(dist>reach || dist>=bestDist) continue;
+    if(!extended && dist>3.0) continue;
     if(api.bool('inside_hitbox_only') && dist > 0.10000000149011612) continue;
     var living = !!e.player || ((e.class||'').indexOf('Living')>=0);
     var hurt = living ? (e.hurtTime||0) : 1e9;
@@ -63,10 +82,9 @@ function onEvent(api,event){
       else if(mode===0) take = hurt < bestHurt || (hurt===bestHurt && dist<bestDist);
       else take = hp < bestHp || (hp===bestHp && dist<bestDist);
     }
-    if(take){ best=e; bestHit={x:ex+lx*dist,y:ey+ly*dist,z:ez+lz*dist}; bestDist=dist; bestLiving=living; bestHurt=hurt; bestHp=hp; }
+    if(take){ best=e; bestDist=dist; bestLiving=living; bestHurt=hurt; bestHp=hp; }
   }
   if(!best) return;
-  // if beyond 3 but within extended - emulate miss when not extended; we can't check, assume 3
   var ref = api.entityById ? api.entityById(best.id) : null;
   if(ref){
     event.cancel();

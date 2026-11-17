@@ -12,11 +12,18 @@ namespace SlinkyNative {
 namespace {
 
 // Minecraft 1.8.9 is visible to us under one of two CLASS names:
-//   net/minecraft/client/Minecraft : Forge (SRG members), MCP/dev (named members)
+//   net/minecraft/client/Minecraft : Forge (SRG members), MCP/dev (named members),
+//                                    OneClient/Ornithe (calamus members, f_*/m_*)
 //   ave                            : Vanilla, OptiFine, Lunar, Badlion (notch / obfuscated)
 const char* const kNamedClassSig    = "Lnet/minecraft/client/Minecraft;";
 const char* const kOfficialClassSig = "Lave;";
 const jint kAccStatic = 0x0008;
+
+// calamus intermediary member names: f_33079084 / m_20213497 style.
+bool IsCalamusMemberName(const std::string& name) {
+    return name.size() > 3 && (name[0] == 'f' || name[0] == 'm') && name[1] == '_'
+        && name.find_first_not_of("0123456789", 2) == std::string::npos;
+}
 
 void FreeJvmti(jvmtiEnv* jvmti, char* p) {
     if (p) jvmti->Deallocate(reinterpret_cast<unsigned char*>(p));
@@ -90,6 +97,11 @@ Verdict Classify(JNIEnv* env, jvmtiEnv* jvmti, jclass cls, bool officialClass) {
     } else if (Contains(statics, "field_71432_P") || HasStaticField(env, cls, "field_71432_P", selfSig)) {
         v.mapping = MappingType::Srg;
         v.fieldName = "field_71432_P";
+    } else if (!statics.empty() && IsCalamusMemberName(statics[0])) {
+        // OneClient / Ornithe calamus-intermediary: the singleton keeps a lone f_* static name
+        // while class names stay MCP-style (net.minecraft.client.Minecraft).
+        v.mapping = MappingType::Calamus;
+        v.fieldName = statics[0];
     } else if (statics.size() == 1) {
         // Unknown field name: decide by the accessor method instead.
         if (HasStaticMethod(env, cls, "func_71410_x", "()Lnet/minecraft/client/Minecraft;")) {
@@ -218,6 +230,7 @@ bool MinecraftDetector::Detect(MinecraftInfo& outInfo) {
                 switch (verdict.mapping) {
                 case MappingType::Named:    outInfo.mappingName = "named";    outInfo.resourceId = 101; break;
                 case MappingType::Srg:      outInfo.mappingName = "srg";      outInfo.resourceId = 102; break;
+                case MappingType::Calamus:  outInfo.mappingName = "calamus";  outInfo.resourceId = 104; break;
                 default:                    outInfo.mappingName = "official"; outInfo.resourceId = 103; break;
                 }
                 outInfo.minecraftClass = static_cast<jclass>(env->NewGlobalRef(cls));
@@ -240,7 +253,7 @@ bool MinecraftDetector::Detect(MinecraftInfo& outInfo) {
                 if (unknownSince == 0) unknownSince = GetTickCount64();
                 if (GetTickCount64() - unknownSince > unknownGiveUpMs) {
                     Logger::Log(L"Minecraft classes were found but use a naming scheme this build does not support");
-                    Logger::Log(L"(send this log to the developer; supported: Forge/SRG, Vanilla/OptiFine/Lunar/Badlion/notch, MCP)");
+                    Logger::Log(L"(send this log to the developer; supported: Forge/SRG, Vanilla/OptiFine/Lunar/Badlion/notch, MCP, OneClient/Ornithe-calamus)");
                     return false;
                 }
             } else {

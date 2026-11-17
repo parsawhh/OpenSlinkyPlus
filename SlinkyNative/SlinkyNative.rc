@@ -5,4 +5,5 @@
 IDR_PAYLOAD_NAMED    RCDATA "payload/slinky-named.jar"
 IDR_PAYLOAD_SRG      RCDATA "payload/slinky-srg.jar"
 IDR_PAYLOAD_OFFICIAL RCDATA "payload/slinky-official.jar"
+IDR_PAYLOAD_CALAMUS  RCDATA "payload/slinky-calamus.jar"
 #endif

@@ -17,7 +17,7 @@ var lastPlaceTime=0, lastSlot=-1, progress=0;
 var lockedBedFoot=null, lockedBedFacing=null;
 
 function onEnable(api){ var p=api.player(); if(p){ serverYaw=p.yaw; serverPitch=p.pitch; aimYaw=serverYaw; aimPitch=serverPitch; lastSteppedYaw=serverYaw; lastSteppedPitch=serverPitch; lastSlot=api.heldSlot?api.heldSlot():-1; } progress=0; resetTarget(); lockedBedFoot=null; lockedBedFacing=null; }
-function onDisable(api){ if(lastSlot>=0 && api.selectSlot){} progress=0; resetTarget(); lockedBedFoot=null; lockedBedFacing=null; }
+function onDisable(api){ if(lastSlot>=0 && api.heldSlot && api.heldSlot()!==lastSlot && api.selectSlot) api.selectSlot(lastSlot); lastSlot=-1; progress=0; resetTarget(); lockedBedFoot=null; lockedBedFacing=null; }
 function resetTarget(){ targetBlock=null; targetFacing=null; targetHitVec=null; }
 
 function isBed(api,x,y,z){ var b=api.blockAt(x,y,z); return b && b.id===26; }
@@ -25,7 +25,7 @@ function isBedFoot(api,pos){ if(!isBed(api,pos.x,pos.y,pos.z)) return false; var
 function isValidBed(api,pos){ if(!pos) return false; return isBed(api,pos.x,pos.y,pos.z); }
 function getBedFacing(api,pos){ var b=api.blockAt(pos.x,pos.y,pos.z); if(!b) return null; switch(b.meta&3){case 0:return 'SOUTH';case 1:return 'WEST';case 2:return 'NORTH';case 3:return 'EAST';} return null; }
 function leftOf(f){ switch(f){case 'NORTH':return 'WEST';case 'WEST':return 'SOUTH';case 'SOUTH':return 'EAST';case 'EAST':return 'NORTH';} return 'NORTH'; }
-function opposite(f){ return f==='NORTH'?'SOUTH':f==='SOUTH'?'NORTH':f==='WEST'?'EAST':f==='EAST'?'WEST':f; }
+function opposite(f){ return f==='NORTH'?'SOUTH':f==='SOUTH'?'NORTH':f==='WEST'?'EAST':f==='EAST'?'WEST':f==='UP'?'DOWN':f==='DOWN'?'UP':f; }
 function offset(pos,f){ if(f==='NORTH') return {x:pos.x,y:pos.y,z:pos.z-1}; if(f==='SOUTH') return {x:pos.x,y:pos.y,z:pos.z+1}; if(f==='WEST') return {x:pos.x-1,y:pos.y,z:pos.z}; if(f==='EAST') return {x:pos.x+1,y:pos.y,z:pos.z}; if(f==='UP') return {x:pos.x,y:pos.y+1,z:pos.z}; if(f==='DOWN') return {x:pos.x,y:pos.y-1,z:pos.z}; return {x:pos.x,y:pos.y,z:pos.z}; }
 
 function isReplaceable(api,pos){ var b=api.blockAt(pos.x,pos.y,pos.z); if(!b) return true; return !!b.air || b.id===8||b.id===9||b.id===10||b.id===11||b.id===51; }
@@ -67,6 +67,7 @@ function withinTol(useYaw,usePitch,tYaw,tPitch,api){ return Math.abs(wrap(useYaw
 function onTick(api){
   if(!api.isEnabled || !api.isEnabled()) return;
   var p=api.player(); if(!p||!p.inWorld) return;
+  if(api.screenOpen && api.screenOpen()) return;
   serverYaw=p.yaw; serverPitch=p.pitch;
   updateProgress(api);
   if(!isValidBed(api,lockedBedFoot)){ lockedBedFoot=null; lockedBedFacing=null; findNearestBed(api); }
@@ -88,18 +89,25 @@ function onTick(api){
 
   var useYaw = lastSteppedYaw, usePitch = lastSteppedPitch;
   if(!withinTol(useYaw,usePitch,aimYaw,aimPitch,api)) return;
+  // wait until the rotation actually reached the server-side rotation before clicking
+  if(Math.abs(wrap(p.yaw-aimYaw))>2.0 || Math.abs(p.pitch-aimPitch)>2.0) return;
   var now=api.now(); if(now-lastPlaceTime < api.num('place_delay')) return;
-  // attempt place
+  // the script placeBlock takes the destination block plus the face being clicked
   if(api.holdingBlock && api.holdingBlock()){
-    api.swing();
-    if(api.placeBlock) api.placeBlock(targetBlock.x,targetBlock.y,targetBlock.z,targetFacing);
-    lastPlaceTime=now; resetTarget();
+    if(api.placeBlock && api.placeBlock(next.x,next.y,next.z,targetFacing)){
+      if(api.bool('swing')){ api.swing(); }
+      else if(api.newPacket && api.sendPacket){
+        var anim=api.newPacket('net.minecraft.network.play.client.C0APacketAnimation');
+        if(anim) api.sendPacket(anim);
+      }
+      lastPlaceTime=now; resetTarget();
+    }
   }
 }
 
 function computePlacement(api,wantPlace,isRoof){
   resetTarget();
-  var p=api.player(); var eyes={x:p.x,y:p.y+1.62,z:p.z};
+  var p=api.player(); var eye=typeof p.eyeHeight==='number'?p.eyeHeight:1.62; var eyes={x:p.x,y:p.y+eye,z:p.z};
   var reach=api.num('range'); var reachSq=reach*reach;
   var faces=['DOWN','UP','NORTH','SOUTH','WEST','EAST'];
   for(var i=0;i<faces.length;i++){
@@ -135,6 +143,9 @@ function updateProgress(api){ if(!lockedBedFoot||!lockedBedFacing){ progress=0; 
 function getProgressColor(){ if(progress<=0.33) return 0xFF5555; if(progress<=0.66) return 0xFFFF55; return 0x55FF55; }
 
 function onEvent(api,event){
+  if(event.getType()===13 && (api.num('move_fix')|0)===1 && targetBlock){
+    if(api.keyDown && api.keyDown('Forward')) event.setRemapMovement(true);
+  }
   if(event.getType()===7 && api.bool('show_progress')){
     var d=api.draw(); if(!d||!d.text) return;
     var sw=854,sh=480; try{ sw=event.getRenderWidth?event.getRenderWidth():sw; sh=event.getRenderHeight?event.getRenderHeight():sh;}catch(e){}

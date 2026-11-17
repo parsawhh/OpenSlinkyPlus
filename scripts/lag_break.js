@@ -22,7 +22,7 @@ function onDisable(api){ dispatchBlink(api); }
 function gi(api){}
 
 function ticksExisted(api){ var p=api.player(); return p?(p.ticksExisted||api.getTick()||0):(api.getTick()||0); }
-function isMoving(api){ var p=api.player(); return !!p && ((p.moveForward||0)!==0 || (p.moveStrafing||0)!==0 || Math.abs(p.vx||0)+Math.abs(p.vz||0)>0.01); }
+function isMoving(api){ var p=api.player(); return !!p && ((p.moveForward||0)!==0 || (p.moveStrafing||0)!==0); }
 
 function getNearestTarget(api, maxDist){
   var ents=api.entities(), best=null, bd=1e9, p=api.player(); if(!p) return null;
@@ -72,10 +72,10 @@ function onEvent(api,event){
     if(releasing){ event.setDispatchMode(0); return; }
     if(blinking || blinkTicks>0){ event.setDispatchMode(1); }
     if(!api.bool('dispatch_on_attack') || blinkTicks<=0) return;
-    if(cls.indexOf('C02PacketUseEntity')>=0 && cls.indexOf('Action')>=0 || cls.indexOf('C02PacketUseEntity')>=0){
-      // detect ATTACK
-      var s=String(cls);
-      try{ var ref=event.packetRef(); var act=ref&&ref.call?String(ref.call('getAction')||''):''; if(act.indexOf('ATTACK')>=0) pendingDispatch=true; else if(s.indexOf('ATTACK')>=0) pendingDispatch=true; }catch(e){ pendingDispatch=true; }
+    if(cls.indexOf('C02PacketUseEntity')>=0){
+      var ref=event.packetRef();
+      var act=ref?String(ref.get('action')||''):'';
+      if(act.indexOf('ATTACK')>=0) pendingDispatch=true;
     }
     return;
   }
@@ -113,7 +113,23 @@ function onEvent(api,event){
     var mode = api.num('visual_mode')|0;
     var d = api.draw(); if(!d) return;
     var sw=854, sh=480; try{ sw=event.getRenderWidth?event.getRenderWidth():sw; sh=event.getRenderHeight?event.getRenderHeight():sh; }catch(e){}
-    if(mode===2 || mode===0 || mode===1){
+    var progress=getDisplayProgress(api);
+    if(mode===0){
+      var bw=100, bh=5, bx=sw/2-bw/2, by=sh/2+10;
+      d.color(0,0,0,0.6); d.rect(bx,by,bw,bh);
+      d.color(1,1,1,0.9); d.rect(bx,by,bw*progress,bh);
+    } else if(mode===1){
+      var cx=sw/2, cy=sh/2, r=radius;
+      var endAngle=270+360*progress;
+      d.color(1,1,1,0.9); d.lineWidth(api.num('circle_thickness'));
+      var steps=Math.max(2,Math.ceil(progress*72));
+      var prevX=cx+Math.cos(270*Math.PI/180)*r, prevY=cy+Math.sin(270*Math.PI/180)*r;
+      for(var i=1;i<=steps;i++){
+        var angle=270+(endAngle-270)*i/steps;
+        var px=cx+Math.cos(angle*Math.PI/180)*r, py=cy+Math.sin(angle*Math.PI/180)*r;
+        d.line(prevX,prevY,px,py); prevX=px; prevY=py;
+      }
+    } else {
       var txt = 'Blinking: '+blinkTicks;
       if(d.text){ d.text(txt, sw/2 + 1, sh/2 + 11, 0xC8000000, false, 9); d.text(txt, sw/2, sh/2 + 10, 0xFFFFFFFF, false, 9); }
     }

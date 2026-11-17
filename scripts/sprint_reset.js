@@ -14,7 +14,7 @@ var attacked = false, needsReset = false, ticksSinceAttack = 0, lastTargetId = n
 function onEnable(api){ attacked=false; needsReset=false; ticksSinceAttack=0; lastTargetId=null; }
 function onDisable(api){ attacked=false; needsReset=false; ticksSinceAttack=0; lastTargetId=null; }
 
-function isMoving(p){ return (p.moveForward||0) !== 0 || (p.moveStrafing||0) !== 0 || Math.abs(p.vx||0)+Math.abs(p.vz||0) > 0.02; }
+function isMoving(p){ return (p.moveForward||0) !== 0 || (p.moveStrafing||0) !== 0; }
 
 function canCrit(p){
   if(!p) return false;
@@ -22,29 +22,13 @@ function canCrit(p){
   if(p.inWater) return false;
   if(p.inLava) return false;
   if(p.onLadder) return false;
+  if(p.blindness) return false;
   if(p.riding) return false;
   return true;
 }
 
 function sendC0B(api, action){
-  // action: START_SPRINTING / STOP_SPRINTING
-  try{
-    var pr = api.rawPlayer(); if(!pr) return false;
-    var cls = 'net.minecraft.network.play.client.C0BPacketEntityAction';
-    var actCls = 'net.minecraft.network.play.client.C0BPacketEntityAction$Action';
-    var act = pr.findClass ? pr.findClass(actCls) : null;
-    var field = action==='START_SPRINTING' ? 'START_SPRINTING' : 'STOP_SPRINTING';
-    var A = null;
-    try{ A = java.lang.Class.forName(actCls.replace(/\$/g,'$')).getField(field).get(null); }catch(e){}
-    if(!A){
-      try{ var c = api.ref(pr.raw()).raw().getClass().getClassLoader().loadClass(actCls); A = c.getField(field).get(null); }catch(e2){}
-    }
-    var pkt = api.newPacket(cls, pr.raw(), A);
-    if(pkt) return api.sendPacket(pkt);
-  }catch(e){}
-  // fallback
-  if(action==='START_SPRINTING') api.sendSprintPacket(true); else api.sendSprintPacket(false);
-  return true;
+  return api.sendSprintPacket(action === 'START_SPRINTING');
 }
 
 function performCritReset(api){

@@ -36,16 +36,10 @@ function onTick(api){ // PostMotion equivalent
   } else {
     flag1 = d2 > d3 && d2 > 2.5 && d2 < 6.0;
   }
-  // activate when swinging/attacking and condition met
-  if(flag1 && (p.swinging || p.isSwingInProgress || false)){
+  if(flag1 && p.swinging){
     holding = true;
     holdUntil = api.now() + api.num('max_ping_spoof');
-  } else {
-    // also allow hold if condition persists recently; approximate by keeping while flag1 true
-    if(holding && !flag1) holding=false;
   }
-  // fallback: if attacking recently keep; detect via target presence + flag
-  if(flag1 && api.target && api.target() && api.target().id===targetId){ holding=true; holdUntil=Math.max(holdUntil, api.now()+api.num('max_ping_spoof')); }
   if(holding && api.now()>=holdUntil){ holding=false; }
 }
 
@@ -68,9 +62,10 @@ function onEvent(api,event){
             realTargetPosition.x+=dx; realTargetPosition.y+=dy; realTargetPosition.z+=dz;
           }
         } else if(cls.indexOf('S18PacketEntityTeleport')>=0){
-          var eid2=null; try{ eid2=ref.call('getEntityId'); }catch(e){}
+          var eid2=null; try{ eid2=ref.get('entityId'); }catch(e){}
+          if(eid2==null) try{ eid2=ref.call('getEntityId'); }catch(e){}
           if((eid2|0)===targetId){
-            try{ realTargetPosition.x=(ref.call('getX')||0)/32.0; realTargetPosition.y=(ref.call('getY')||0)/32.0; realTargetPosition.z=(ref.call('getZ')||0)/32.0; }catch(e){}
+            try{ realTargetPosition.x=((ref.get('posX')||0))/32.0; realTargetPosition.y=((ref.get('posY')||0))/32.0; realTargetPosition.z=((ref.get('posZ')||0))/32.0; }catch(e){}
           }
         }
       }catch(e){}

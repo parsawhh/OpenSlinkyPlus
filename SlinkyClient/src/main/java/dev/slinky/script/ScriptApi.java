@@ -129,6 +129,13 @@ public final class ScriptApi {
    public boolean setKeyDown(String binding, boolean down) {
       return this.game.setKeyDown(binding, down);
    }
+   public boolean physicalKeyDown(String binding) {
+      return this.game.physicalKeyDown(binding);
+   }
+
+   public boolean screenOpen() {
+      return this.game.screenOpen();
+   }
 
    public boolean attack(String targetName) {
       return this.game.attack(targetName);
@@ -170,7 +177,7 @@ public final class ScriptApi {
    }
 
    public void clearRotation() {
-      RotationService.clearManual();
+      this.runtime.clearRetain();
    }
 
    public double cameraYaw() {
@@ -214,7 +221,8 @@ public final class ScriptApi {
    public ScriptRef newPacket(String className) { return this.game.newPacket(className); }
    public ScriptRef newPacket(String className, Object a) { return this.game.newPacket(className, new Object[]{raw(a)}); }
    public ScriptRef newPacket(String className, Object a, Object b) { return this.game.newPacket(className, new Object[]{raw(a), raw(b)}); }
-   public ScriptRef newPacket(String className, Object a, Object b, Object c) { return this.game.newPacket(className, new Object[]{raw(a), raw(b), raw(c)}); }
+    public ScriptRef newPacket(String className, Object a, Object b, Object c) { return this.game.newPacket(className, new Object[]{raw(a), raw(b), raw(c)}); }
+    public ScriptRef newPacket(String className, Object a, Object b, Object c, Object d) { return this.game.newPacket(className, new Object[]{raw(a), raw(b), raw(c), raw(d)}); }
    public boolean sendSprintPacket(boolean start) { return this.game.sendSprintPacket(start); }
 
    // --- draw ---

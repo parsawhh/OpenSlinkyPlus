@@ -11,7 +11,8 @@ enum class MappingType {
     Unknown = 0,
     Named = 101,     // MCP mappings (resource 101)
     Srg = 102,       // SRG mappings (resource 102)
-    Official = 103   // Notch/Vanilla/Lunar/Badlion obfuscated mappings (resource 103)
+    Official = 103,  // Notch/Vanilla/OptiFine/Lunar/Badlion obfuscated mappings (resource 103)
+    Calamus = 104    // Ornithe calamus-intermediary-gen2, used by OneClient 1.8.9 (resource 104)
 };
 
 struct MinecraftInfo {

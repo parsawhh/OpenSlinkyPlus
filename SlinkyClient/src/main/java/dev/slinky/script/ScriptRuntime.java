@@ -29,6 +29,10 @@ public final class ScriptRuntime {
    private ScriptModule module;
    private ScriptEngine engine;
    private ScriptApi api;
+   private boolean retainRotation;
+   private float retainYaw;
+   private float retainPitch;
+   private long retainAt;
    private volatile boolean failed;
    private volatile String error;
    private volatile long ticks;
@@ -183,6 +187,7 @@ public final class ScriptRuntime {
       this.currentDraw.set(null);
       try {
          this.engine.call("onEvent", this.api, new ScriptEvent(event));
+         this.applyRetain(event);
       } catch (ScriptException e) {
          this.fail(e);
       } finally {
@@ -287,8 +292,26 @@ public final class ScriptRuntime {
    }
 
    public void retain(float yaw, float pitch) {
+      this.retainRotation = true;
+      this.retainYaw = yaw;
+      this.retainPitch = pitch;
+      this.retainAt = System.currentTimeMillis();
       if (this.context != null) {
          RotationService.retain(this.context, true, yaw, pitch);
+      }
+   }
+
+   public void clearRetain() {
+      this.retainRotation = false;
+      RotationService.clearManual();
+   }
+
+   private void applyRetain(SemanticEvent event) {
+      if (event.type == 13 && this.retainRotation && System.currentTimeMillis() - this.retainAt < 500L) {
+         event.active = true;
+         event.overrideRotation = true;
+         event.yaw = this.retainYaw;
+         event.pitch = this.retainPitch;
       }
    }
 

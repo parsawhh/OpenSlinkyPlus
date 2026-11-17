@@ -66,7 +66,7 @@ def main(jar, ns, mapfile):
                     problem = 'class-not-remapped'
                 elif owner in target_classes and mname in named_only and len(mname) > 2:
                     problem = 'member-not-remapped'
-            elif ns == 'srg':
+            elif ns == 'srg' or ns == 'calamus':
                 if owner in named_classes and mname in named_only:
                     problem = 'member-not-remapped'
             if problem:

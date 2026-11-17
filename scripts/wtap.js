@@ -27,9 +27,9 @@ function onDisable(api){ restoreForwardKey(api); }
 
 function handleRePress(api){
   if(hasTimeElapsed(rePressTimer, Number(rePressDelay), api)){
-    // if physical key down, set pressed true
-    if(api.keyDown && api.keyDown('Forward')){ api.setKeyDown('Forward', true); }
-    else { api.setKeyDown('Forward', true); }
+    if(api.physicalKeyDown ? api.physicalKeyDown('Forward') : api.keyDown('Forward')){
+      api.setKeyDown('Forward', true);
+    }
     rePressPending = false;
   }
 }
@@ -45,7 +45,7 @@ function isTargetVulnerable(api){
 
 function restoreForwardKey(api){
   if(api && api.setKeyDown){
-    var phys = api.keyDown ? api.keyDown('Forward') : true;
+    var phys = api.physicalKeyDown ? api.physicalKeyDown('Forward') : api.keyDown('Forward');
     api.setKeyDown('Forward', phys);
   }
   releasePending = false;
@@ -70,10 +70,6 @@ function onEvent(api, event){
     if(!event.isActive || !event.isActive()) return; // attack
     var t = api.target();
     if(t == null) return;
-    // must be living target (MappedClasses.lG)
-    if(t.player === false && !(t.class && (t.class.indexOf('Player')>=0 || t.class.indexOf('Living')>=0 || t.class.indexOf('Entity')>=0))) {
-      // allow; many entities living
-    }
     if(releasePending || rePressPending) return;
     if(!isTargetVulnerable(api)) return;
     if(shouldTrigger()){
@@ -86,8 +82,10 @@ function onEvent(api, event){
   if(type === 0){ // tick
     var p = api.player();
     if(!p || !p.inWorld){ if(releasePending||rePressPending) restoreForwardKey(api); return; }
-    // if current screen open -> restore
-    // script api lacks direct screen check; best-effort: if not input focus, still run timers? original restores on screen
+    if(api.screenOpen && api.screenOpen()){
+      if(releasePending || rePressPending) restoreForwardKey(api);
+      return;
+    }
     if(releasePending){ handleRelease(api); return; }
     if(rePressPending){ handleRePress(api); return; }
   }

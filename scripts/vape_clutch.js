@@ -84,7 +84,7 @@ function clear() {
 }
 
 function onEvent(api, event) {
-   if (event.type !== 21) {
+   if (event.getType() !== 21) {
       return;
    }
 

@@ -27,8 +27,8 @@ function clamp(v,lo,hi){ return v<lo?lo:(v>hi?hi:v); }
 function randf(a,b){ return a + Math.random()*(b-a); }
 
 function getBowPower(api){
-  var dur = 0;
-  try{ var pr=api.rawPlayer(); if(pr) dur = (pr.call('getItemInUseDuration')|0); }catch(e){}
+  var p=api.player(); if(!p) return 0;
+  var dur = p.itemInUseDuration||p.itemInUseCount||0;
   var charge = dur/20.0;
   charge = (charge*charge + charge*2.0)/3.0;
   return Math.min(charge, 1.0);
@@ -38,10 +38,8 @@ function isHoldingDrawnBow(api){
   var h = api.heldItem(); if(!h) return false;
   var cls = (h.class||'')+''; var name=(h.name||'');
   if(h.id!==261 && cls.indexOf('Bow')<0 && name.indexOf('Bow')<0) return false;
-  if(!getBowPower(api)) {}
-  // using item
-  var using=false; try{ var pr=api.rawPlayer(); if(pr) using = !!pr.call('isUsingItem'); }catch(e){}
-  if(!using) return false;
+  var p=api.player();
+  if(!p || !p.usingItem) return false;
   return getBowPower(api) >= (api.num('min_charge')/100.0);
 }
 
@@ -63,12 +61,29 @@ function isValidTarget(api, ent){
   if(ent.invisible) return false;
   if((ent.distance||999) > api.num('range')) return false;
   if(angleToEntity(api,p,ent) > api.num('fov')) return false;
-  // through walls: skip raytrace (needs world raytrace) unless false -> we can't reliably check, so be permissive only if on
-  // teams/bots via relationship
-  if(api.bool('teams') && (ent.flags&4)) return false;
+  if(!api.bool('through_walls') && rayHitsBlock(api,p,ent)) return false;
+  if(api.bool('teams') && (ent.flags&1)) return false;
   if(api.bool('anti_bot') && (ent.flags&2)) return false;
-  if(ent.flags&1) return false; // friend
+  if(ent.flags&4) return false;
   return true;
+}
+
+function rayHitsBlock(api,p,ent){
+  var ex=p.x, ey=p.y+(p.eyeHeight||1.62), ez=p.z;
+  var tx=ent.x, ty=ent.y+(ent.eyeHeight||1.62), tz=ent.z;
+  var dx=tx-ex, dy=ty-ey, dz=tz-ez;
+  var dist=Math.sqrt(dx*dx+dy*dy+dz*dz);
+  if(dist<=0.0) return false;
+  var steps=Math.ceil(dist/0.25);
+  for(var i=1;i<steps;i++){
+    var t=i/steps;
+    var b=api.blockAt(Math.floor(ex+dx*t), Math.floor(ey+dy*t), Math.floor(ez+dz*t));
+    if(!b || b.air) continue;
+    var id=b.id|0;
+    if(id===8||id===9||id===10||id===11||id===31||id===37||id===38||id===39||id===40||id===50||id===51||id===78||id===175) continue;
+    return true;
+  }
+  return false;
 }
 
 function findTarget(api){
@@ -87,7 +102,7 @@ function findTarget(api){
 function getBallisticRotations(api, ent, power){
   var p=api.player();
   var predictSize=api.num('predict');
-  var motionX=(ent.vx||0)*predictSize*20.0, motionY=(ent.vy||0)*predictSize*20.0, motionZ=(ent.vz||0)*predictSize*20.0;
+  var motionX=(ent.vx||0)*predictSize, motionY=(ent.vy||0)*predictSize, motionZ=(ent.vz||0)*predictSize;
   var deltaX=(ent.x+motionX)-p.x;
   var deltaY=((ent.y+motionY)+(ent.eyeHeight||1.62)-0.15)-(p.y+1.62);
   var deltaZ=(ent.z+motionZ)-p.z;
@@ -116,8 +131,12 @@ function onEvent(api,event){
   if(!api.isEnabled || !api.isEnabled()) return;
   var t=event.getType();
   var p=api.player(); if(!p||!p.inWorld) return;
+  if(t===13 && (api.num('mode')|0)===1 && api.bool('move_fix')){
+    event.setRemapMovement(true);
+    return;
+  }
   if(t===0){ // tick/update
-    if(!isHoldingDrawnBow(api)){ reset(); return; }
+    if(!isHoldingDrawnBow(api)){ reset(); api.clearRotation && api.clearRotation(); return; }
     target = findTarget(api);
     if(!target){ silentYaw=NaN; silentPitch=NaN; return; }
     var wanted = getBallisticRotations(api, target, getBowPower(api));

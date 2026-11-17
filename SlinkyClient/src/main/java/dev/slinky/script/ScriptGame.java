@@ -75,6 +75,58 @@ public final class ScriptGame {
          result.put("name", stringMethod(player, ENTITY, "getName", "()Ljava/lang/String;"));
          result.put("id", intMethod(player, ENTITY, "getEntityId", "()I"));
          result.put("ticksExisted", intField(player, ENTITY, "ticksExisted"));
+         result.put("lastX", doubleField(player, ENTITY, "lastTickPosX"));
+         result.put("lastY", doubleField(player, ENTITY, "lastTickPosY"));
+         result.put("lastZ", doubleField(player, ENTITY, "lastTickPosZ"));
+         try {
+            result.put("flags", Integer.valueOf(relationshipFlags(player)));
+            result.put("eyeHeight", Float.valueOf(floatMethod(player, ENTITY, "getEyeHeight", "()F")));
+            result.put("height", Float.valueOf(floatField(player, ENTITY, "height")));
+            result.put("width", Float.valueOf(floatField(player, ENTITY, "width")));
+            result.put("invisible", Boolean.valueOf(booleanMethod(player, ENTITY, "isInvisible", "()Z")));
+            result.put("inWater", Boolean.valueOf(booleanMethod(player, ENTITY, "isInWater", "()Z")));
+            result.put("inLava", Boolean.valueOf(booleanMethod(player, ENTITY, "isInLava", "()Z")));
+            result.put("onLadder", Boolean.valueOf(booleanMethod(player, LIVING, "isOnLadder", "()Z")));
+            result.put("riding", Boolean.valueOf(booleanMethod(player, ENTITY, "isRiding", "()Z")));
+            result.put("swinging", Boolean.valueOf(booleanField(player, LIVING, "isSwingInProgress")));
+            result.put("maxHurtTime", Integer.valueOf(intField(player, LIVING, "maxHurtTime")));
+            result.put("moveForward", Float.valueOf(floatField(player, LIVING, "moveForward")));
+            result.put("moveStrafing", Float.valueOf(floatField(player, LIVING, "moveStrafing")));
+            result.put("collidedHorizontally", Boolean.valueOf(booleanField(player, ENTITY, "collidedHorizontally")));
+            try {
+               Object inUse = field(player, PLAYER, "itemInUse");
+               int inUseCount = intField(player, PLAYER, "itemInUseCount");
+               result.put("itemInUseCount", Integer.valueOf(inUseCount));
+               result.put("itemInUseDuration", Integer.valueOf(inUseCount));
+               if (inUse != null) {
+                  Object item = method(inUse, "net/minecraft/item/ItemStack", "getItem", "()Lnet/minecraft/item/Item;");
+                  int itemId = ((Number)staticMethod("net/minecraft/item/Item", "getIdFromItem", "(Lnet/minecraft/item/Item;)I", item)).intValue();
+                  result.put("itemInUse", Integer.valueOf(itemId));
+                  result.put("usingItem", Boolean.TRUE);
+               } else {
+                  result.put("itemInUse", Integer.valueOf(0));
+                  result.put("usingItem", Boolean.FALSE);
+               }
+            } catch (Throwable ignored) {
+            }
+            Object blindnessPotion = staticField("net/minecraft/potion/Potion", "blindness");
+            Object blindValue = method(player, LIVING, "isPotionActive", "(Lnet/minecraft/potion/Potion;)Z", blindnessPotion);
+            result.put("blindness", Boolean.valueOf(blindValue instanceof Boolean && ((Boolean)blindValue).booleanValue()));
+            Object capabilities = field(player, PLAYER, "capabilities");
+            if (capabilities != null) {
+               Map<String, Object> caps = new HashMap<String, Object>();
+               boolean flying = booleanField(capabilities, PLAYER, "isFlying");
+               boolean allowFlying = booleanField(capabilities, PLAYER, "allowFlying");
+               caps.put("flying", Boolean.valueOf(flying));
+               caps.put("isFlying", Boolean.valueOf(flying));
+               caps.put("allowFlying", Boolean.valueOf(allowFlying));
+               caps.put("isCreativeMode", Boolean.valueOf(booleanField(capabilities, PLAYER, "isCreativeMode")));
+               caps.put("disableDamage", Boolean.valueOf(booleanField(capabilities, PLAYER, "disableDamage")));
+               result.put("flying", Boolean.valueOf(flying));
+               result.put("capabilities", caps);
+            }
+         } catch (Throwable ignored) {
+         }
       } catch (Throwable e) {
          result.put("error", describe(e));
       }
@@ -133,6 +185,34 @@ public final class ScriptGame {
             row.put("vz", doubleField(entity, ENTITY, "motionZ"));
             row.put("hurtTime", intField(entity, ENTITY, "hurtTime"));
             row.put("ticksExisted", intField(entity, ENTITY, "ticksExisted"));
+            row.put("yaw", floatField(entity, ENTITY, "rotationYaw"));
+            row.put("pitch", floatField(entity, ENTITY, "rotationPitch"));
+            row.put("lastX", doubleField(entity, ENTITY, "lastTickPosX"));
+            row.put("lastY", doubleField(entity, ENTITY, "lastTickPosY"));
+            row.put("lastZ", doubleField(entity, ENTITY, "lastTickPosZ"));
+
+            try {
+               row.put("flags", Integer.valueOf(relationshipFlags(entity)));
+               row.put("eyeHeight", Float.valueOf(floatMethod(entity, ENTITY, "getEyeHeight", "()F")));
+               row.put("height", Float.valueOf(floatField(entity, ENTITY, "height")));
+               row.put("width", Float.valueOf(floatField(entity, ENTITY, "width")));
+               row.put("invisible", Boolean.valueOf(booleanMethod(entity, ENTITY, "isInvisible", "()Z")));
+               row.put("inWater", Boolean.valueOf(booleanMethod(entity, ENTITY, "isInWater", "()Z")));
+               row.put("inLava", Boolean.valueOf(booleanMethod(entity, ENTITY, "isInLava", "()Z")));
+            } catch (Throwable ignored) {
+            }
+
+            try {
+               row.put("onLadder", Boolean.valueOf(booleanMethod(entity, LIVING, "isOnLadder", "()Z")));
+               row.put("swinging", Boolean.valueOf(booleanField(entity, LIVING, "isSwingInProgress")));
+               row.put("maxHurtTime", Integer.valueOf(intField(entity, LIVING, "maxHurtTime")));
+            } catch (Throwable ignored) {
+            }
+
+            try {
+               row.put("riding", Boolean.valueOf(booleanMethod(entity, ENTITY, "isRiding", "()Z")));
+            } catch (Throwable ignored) {
+            }
 
             try {
                float health = floatMethod(entity, LIVING, "getHealth", "()F");
@@ -466,6 +546,29 @@ public final class ScriptGame {
       }
    }
 
+   public boolean physicalKeyDown(String binding) {
+      try {
+         Object key = keyBinding(binding);
+         if (key == null) return false;
+         int code = ((Number)method(key, "net/minecraft/client/settings/KeyBinding", "getKeyCode", "()I")).intValue();
+         Class<?> keyboard = namedClass("org/lwjgl/input/Keyboard");
+         Method isKeyDown = findMethod(keyboard, "isKeyDown", 1);
+         Object value = isKeyDown.invoke(null, Integer.valueOf(code));
+         return value instanceof Boolean && ((Boolean)value).booleanValue();
+      } catch (Throwable e) {
+         return keyDown(binding);
+      }
+   }
+
+   public boolean screenOpen() {
+      try {
+         Object minecraft = minecraft();
+         return minecraft != null && field(minecraft, MINECRAFT, "currentScreen") != null;
+      } catch (Throwable e) {
+         return false;
+      }
+   }
+
    public boolean setKeyDown(String binding, boolean down) {
       try {
          Object key = keyBinding(binding);
@@ -608,6 +711,14 @@ public final class ScriptGame {
             return 0;
          }
 
+         return relationshipFlags(entity);
+      } catch (Throwable e) {
+         return 0;
+      }
+   }
+
+   private int relationshipFlags(Object entity) {
+      try {
          Object value = staticMethod("dev/slinky/client/target/RelationshipService", "flags", "(Lnet/minecraft/entity/Entity;)I", entity);
          return value instanceof Number ? ((Number)value).intValue() : 0;
       } catch (Throwable e) {
@@ -622,7 +733,7 @@ public final class ScriptGame {
             return false;
          }
 
-         staticMethod("dev/slinky/client/target/RelationshipService", "set", "(Lnet/minecraft/entity/Entity;IZ)V", entity, 1, friend);
+         staticMethod("dev/slinky/client/target/RelationshipService", "set", "(Lnet/minecraft/entity/Entity;IZ)V", entity, 4, friend);
          return true;
       } catch (Throwable e) {
          return false;
@@ -831,6 +942,12 @@ public final class ScriptGame {
    }
 
    // --- reflection internals ---
+   private Object staticField(String owner, String name) throws Exception {
+      Class<?> type = namedClass(owner);
+      Field field = findField(type, Mappings.mapField(owner, name));
+      return field.get(null);
+   }
+
    private Object staticMethod(String owner, String name, String descriptor, Object... args) throws Exception {
       Class<?> type = namedClass(owner);
       Method method = findMethod(type, Mappings.mapMethod(owner, name, descriptor), args.length);
@@ -872,6 +989,11 @@ public final class ScriptGame {
    private boolean booleanField(Object target, String owner, String name) throws Exception {
       Field field = findField(target.getClass(), Mappings.mapField(owner, name));
       return field.getBoolean(target);
+   }
+
+   private boolean booleanMethod(Object target, String owner, String name, String descriptor) throws Exception {
+      Object value = method(target, owner, name, descriptor);
+      return value instanceof Boolean && ((Boolean)value).booleanValue();
    }
 
    private float floatMethod(Object target, String owner, String name, String descriptor) throws Exception {
