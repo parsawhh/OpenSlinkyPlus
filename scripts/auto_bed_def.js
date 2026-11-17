@@ -89,8 +89,6 @@ function onTick(api){
 
   var useYaw = lastSteppedYaw, usePitch = lastSteppedPitch;
   if(!withinTol(useYaw,usePitch,aimYaw,aimPitch,api)) return;
-  // wait until the rotation actually reached the server-side rotation before clicking
-  if(Math.abs(wrap(p.yaw-aimYaw))>2.0 || Math.abs(p.pitch-aimPitch)>2.0) return;
   var now=api.now(); if(now-lastPlaceTime < api.num('place_delay')) return;
   // the script placeBlock takes the destination block plus the face being clicked
   if(api.holdingBlock && api.holdingBlock()){

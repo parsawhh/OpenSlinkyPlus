@@ -55,6 +55,7 @@ var resetAt = 0;
 var candidates = [];
 var ladderPlan = null;
 var ladderPlaced = false;
+var ladderEngaged = false;
 var steering = null;
 var movement = {forward: 0, backward: 0, left: 0, right: 0};
 var physical = {forward: 0, backward: 0, left: 0, right: 0};
@@ -76,6 +77,7 @@ function clear() {
    candidates = [];
    ladderPlan = null;
    ladderPlaced = false;
+   ladderEngaged = false;
    steering = null;
    savedYaw = null;
    savedPitch = null;
@@ -833,6 +835,15 @@ function isSolid(api, position) {
 function runLadder(api, player) {
    var ladder = ladderPlan;
 
+   if (ladderEngaged) {
+      if (player.onGround) {
+         finish(api, api.now());
+         return;
+      }
+      steering = centeringInput(api, player, ladder);
+      return;
+   }
+
    if (!ladderPlaced) {
       if (ladder.targets.length > 0) {
          var step = ladder.targets[planIndex];
@@ -866,8 +877,8 @@ function runLadder(api, player) {
 
    steering = centeringInput(api, player, ladder);
    catchTick = ladder.tick;
+   ladderEngaged = true;
    api.log('ladder catch engaged');
-   finish(api, api.now());
 }
 
 function centeringInput(api, player, ladder) {
