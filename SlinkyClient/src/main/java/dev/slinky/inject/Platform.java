@@ -3,6 +3,10 @@ package dev.slinky.inject;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.instrument.ClassDefinition;
+import java.lang.instrument.ClassFileTransformer;
+import java.lang.instrument.Instrumentation;
+import java.security.ProtectionDomain;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import net.minecraft.client.Minecraft;
@@ -14,6 +18,7 @@ public final class Platform {
    private static Boolean forge;
    private static Boolean lunar;
    private static Boolean badlion;
+   private static Instrumentation instrumentation;
 
    private Platform() {
    }
@@ -22,6 +27,63 @@ public final class Platform {
       namespace = runtimeNamespace;
       payloadPath = jarPath;
       nativesAvailable = natives;
+   }
+
+   public static void installInstrumentation(Instrumentation value) {
+      instrumentation = value;
+   }
+
+   public static boolean hasInstrumentation() {
+      return instrumentation != null;
+   }
+
+   /**
+    * Returns the bytecode the JVM currently has for the class. Native builds use JVMTI; Fabric
+    * builds (agent attached) capture the buffer a retransformation hands to a transformer.
+    */
+   public static byte[] getClassBytes(Class<?> target) {
+      if (instrumentation == null) {
+         return NativeBridge.getClassBytes(target);
+      }
+
+      final byte[][] captured = new byte[1][];
+      ClassFileTransformer transformer = new ClassFileTransformer() {
+         @Override
+         public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined,
+               ProtectionDomain protectionDomain, byte[] classfileBuffer) {
+            if (classBeingRedefined == target) {
+               captured[0] = classfileBuffer;
+            }
+
+            return null;
+         }
+      };
+      instrumentation.addTransformer(transformer, true);
+
+      try {
+         instrumentation.retransformClasses(target);
+      } catch (Throwable failure) {
+         log("Unable to capture bytecode of " + target.getName(), failure);
+      } finally {
+         instrumentation.removeTransformer(transformer);
+      }
+
+      return captured[0];
+   }
+
+   /** Replaces the loaded class with patched bytes. Native builds use JVMTI retransformation. */
+   public static int redefineClass(Class<?> target, byte[] bytes) {
+      if (instrumentation == null) {
+         return NativeBridge.retransformClass(target, bytes);
+      }
+
+      try {
+         instrumentation.redefineClasses(new ClassDefinition(target, bytes));
+         return 0;
+      } catch (Throwable failure) {
+         log("Unable to redefine " + target.getName(), failure);
+         return -2;
+      }
    }
 
    public static Platform.Namespace getNamespace() {
@@ -124,12 +186,12 @@ public final class Platform {
       if (nativesAvailable) {
          try {
             NativeBridge.log(message);
-            return;
          } catch (UnsatisfiedLinkError var2) {
             nativesAvailable = false;
          }
       }
 
+      LogSink.line(message);
       System.out.println("[OpenSlinky+] " + message);
    }
 
@@ -155,7 +217,8 @@ public final class Platform {
    public static enum Namespace {
       NAMED("named"),
       SRG("srg"),
-      OFFICIAL("official");
+      OFFICIAL("official"),
+      CALAMUS("calamus");
 
       public final String id;
 

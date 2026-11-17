@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "openslinkyplus",
+  "version": "1.0.0",
+  "name": "OpenSlinky+",
+  "description": "OpenSlinky+ modules for OneClient 1.8.9 (Fabric loader + Ornithe calamus names).",
+  "authors": [
+    "OpenSlinky+"
+  ],
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "dev.slinky.inject.fabric.SlinkyFabricEntrypoint"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.14.0"
+  }
+}

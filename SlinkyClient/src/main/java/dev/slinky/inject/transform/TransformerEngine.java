@@ -1,6 +1,5 @@
 package dev.slinky.inject.transform;
 
-import dev.slinky.inject.NativeBridge;
 import dev.slinky.inject.Platform;
 import dev.slinky.shaded.asm.ClassReader;
 import dev.slinky.shaded.asm.ClassWriter;
@@ -47,7 +46,7 @@ public final class TransformerEngine {
          return;
       }
 
-      byte[] original = NativeBridge.getClassBytes(target);
+      byte[] original = Platform.getClassBytes(target);
       if (original == null) {
          throw new IllegalStateException("Unable to capture bytecode of " + runtimeName);
       } else {
@@ -85,10 +84,10 @@ public final class TransformerEngine {
          if (changes != 0) {
             ClassWriter writer = new TransformerEngine.GameClassWriter(3);
             node.accept(writer);
-            int error = NativeBridge.retransformClass(target, writer.toByteArray());
+            int error = Platform.redefineClass(target, writer.toByteArray());
             if (error != 0) {
                throw new IllegalStateException(
-                  "RetransformClasses returned " + error + (error == -1 ? " (load hook never matched the target)" : " (JVMTI error)")
+                  "Class redefinition returned " + error + (error == -1 ? " (load hook never matched the target)" : " (JVMTI error)")
                );
             } else {
                this.applied++;

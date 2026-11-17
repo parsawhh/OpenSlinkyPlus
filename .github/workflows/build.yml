@@ -2,18 +2,66 @@ name: Build OpenSlinkyPlus
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, feature/script-modules ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  build:
+  payload:
+    name: Java payloads
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Fetch build libraries
+        run: |
+          mkdir -p libs
+          base="https://repo1.maven.org/maven2"
+          curl -fsSL -o libs/gson-2.2.4.jar "$base/com/google/code/gson/gson/2.2.4/gson-2.2.4.jar"
+          curl -fsSL -o libs/rhino-1.7.14.jar "$base/org/mozilla/rhino/1.7.14/rhino-1.7.14.jar"
+          for a in asm asm-commons asm-tree asm-util asm-analysis; do
+            curl -fsSL -o "libs/$a-9.7.jar" "$base/org/ow2/asm/$a/9.7/$a-9.7.jar"
+          done
+
+      - name: Build payload jars
+        env:
+          LIBS: ${{ github.workspace }}/libs
+          OUT: ${{ runner.temp }}/payload-build
+        run: bash tools/build-payload.sh
+
+      - name: Upload payload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: slinky-payloads
+          path: SlinkyNative/payload/*.jar
+          if-no-files-found: error
+
+  native:
+    name: Windows launcher
+    needs: payload
     runs-on: windows-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Download payload jars
+        uses: actions/download-artifact@v4
+        with:
+          name: slinky-payloads
+          path: SlinkyNative/payload
 
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1

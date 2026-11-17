@@ -69,6 +69,7 @@ import dev.slinky.module.world.ClutchModule;
 import dev.slinky.module.world.FastMineModule;
 import dev.slinky.module.world.FastPlaceModule;
 import dev.slinky.module.world.GhostHandModule;
+import dev.slinky.script.ScriptHost;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -168,9 +169,11 @@ public final class CoreModules {
          }
       }
 
-      if (!byName.isEmpty()) {
-         throw new IllegalStateException("Unmatched implementations " + byName.keySet());
+      for (Module modulex : byName.values()) {
+         manager.register(modulex);
       }
+
+      ScriptHost.install(manager);
    }
 
    public static List<Module> sourceOnlyIntervals() {

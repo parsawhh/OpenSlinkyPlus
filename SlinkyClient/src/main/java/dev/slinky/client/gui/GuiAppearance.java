@@ -46,7 +46,13 @@ public final class GuiAppearance {
    }
 
    public static String description(Module module) {
-      JsonArray observations = ModuleCatalog.module(module.getName()).getAsJsonArray("descriptor_observations");
+      JsonArray observations;
+      try {
+         observations = ModuleCatalog.module(module.getName()).getAsJsonArray("descriptor_observations");
+      } catch (IllegalArgumentException e) {
+         return module.getDescription();
+      }
+
       return observations.size() == 0 ? module.getDescription() : observations.get(0).getAsJsonObject().get("description").getAsString();
    }
 
